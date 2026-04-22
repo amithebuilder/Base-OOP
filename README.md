@@ -10,18 +10,18 @@ banking/
 ├── requirements.txt
 ├── README.md
 ├── .gitignore
-├── src/banking/          # только бизнес-логика
+├── LICENSE
+├── src/banking/          # бизнес-логика
 │   ├── accounts/
 │   ├── customers/
 │   ├── core/
 │   ├── transactions/
 │   ├── audit/
 │   └── reports/
-├── scripts/              # сценарии и утилиты запуска
-│   ├── demo.py
-│   ├── generate_reports.py
-│   └── scenario_data.py
-└── tests/
+└── scripts/
+    ├── demo.py
+    ├── generate_reports.py
+    └── scenario_data.py
 ```
 
 ## Запуск
@@ -32,11 +32,8 @@ python scripts/demo.py
 python scripts/generate_reports.py
 ```
 
-Локально без entrypoint-команд:
-
-```bash
-python scripts/demo.py
-python scripts/generate_reports.py
-```
-
 При запуске создаётся `var/` с логами и отчётами (в git не хранится).
+
+## Лицензия
+
+См. файл `LICENSE` в репозитории.
