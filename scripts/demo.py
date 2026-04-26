@@ -1,4 +1,4 @@
-﻿"""
+"""
 Full end-to-end demo: clients, accounts, risk assessment, transaction queue.
 Run from project root: python scripts/demo.py
 With editable install: pip install -e . && python scripts/demo.py
@@ -17,7 +17,6 @@ VAR.mkdir(parents=True, exist_ok=True)
 from banking import (  # noqa: E402
     AuditLog,
     RiskAnalyzer,
-    RiskLevel,
     TransactionProcessor,
     TransactionQueue,
 )
@@ -38,56 +37,38 @@ def run_demo() -> None:
     audit = AuditLog(log_file=str(VAR / "demo_audit.jsonl"))
     analyzer = RiskAnalyzer(audit)
     queue = TransactionQueue()
-    proc = TransactionProcessor(bank)
+    proc = TransactionProcessor(bank, risk_analyzer=analyzer)
     audit.info("Demo started", category="system")
 
-    section("2. TRANSACTIONS вЂ” QUEUE & RISK")
+    section("2. TRANSACTIONS -- QUEUE & RISK")
     txs = build_transactions(accounts)
     print(f"Transactions built: {len(txs)}")
 
     for tx in txs:
-        report = analyzer.assess(tx)
-        if report.is_dangerous():
-            tx._mark_failed("Blocked: high risk (manual review required)")
-            print(
-                f"  [BLOCKED] {tx.tx_id[:8]} | {tx.tx_type.value:12s} {tx.amount:>10,.2f} "
-                f"{tx.currency.value} | {report.triggers}"
-            )
-            continue
         queue.enqueue(tx)
-        if report.risk_level != RiskLevel.LOW:
-            print(
-                f"  [RISK {report.risk_level.value.upper():6s}] {tx.tx_id[:8]} | "
-                f"{tx.tx_type.value:12s} {tx.amount:>10,.2f} {tx.currency.value} | "
-                f"triggers: {report.triggers}"
-            )
-    print(f"\nQueue size: {queue.pending_count()}")
+    print(f"Queue size: {queue.pending_count()}")
 
     section("3. PROCESSING QUEUE")
     done = proc.process_queue(queue)
-    pre_failed = [
-        t
-        for t in txs
-        if t.status.value == "failed"
-        and t.failure_reason
-        and "Blocked: high risk" in t.failure_reason
-    ]
-    print(
-        f"Processed from queue: {len(done)}; risk-blocked (not queued): {len(pre_failed)}\n"
-    )
     completed = [t for t in done if t.status.value == "completed"]
-    failed = [t for t in done if t.status.value == "failed"] + pre_failed
+    failed = [t for t in done if t.status.value == "failed"]
     cancelled = [t for t in done if t.status.value == "cancelled"]
     delayed = [t for t in txs if t.status.value == "queued"]
+    risk_blocked = [
+        t for t in failed
+        if t.failure_reason and "HIGH risk" in t.failure_reason
+    ]
+    biz_failed = [t for t in failed if t not in risk_blocked]
     print(
-        f"  Completed: {len(completed)} | Failed: {len(failed)} | "
-        f"Cancelled: {len(cancelled)} | Still queued: {len(delayed)}"
+        f"Completed: {len(completed)} | Failed: {len(failed)} | "
+        f"Cancelled: {len(cancelled)} | Still queued (delayed): {len(delayed)}"
     )
-    print("\nFailed (sample):")
-    for tx in failed[:12]:
-        print(
-            f"  [{tx.tx_id[:8]}] {tx.tx_type.value:12s} {tx.amount:>10,.2f} | {tx.failure_reason}"
-        )
+    print(f"\nBlocked by risk policy ({len(risk_blocked)}):")
+    for tx in risk_blocked:
+        print(f"  [{tx.tx_id[:8]}] {tx.tx_type.value:12s} {tx.amount:>10,.2f} | {tx.failure_reason}")
+    print(f"\nFailed by business rules ({len(biz_failed)}):")
+    for tx in biz_failed[:8]:
+        print(f"  [{tx.tx_id[:8]}] {tx.tx_type.value:12s} {tx.amount:>10,.2f} | {tx.failure_reason}")
 
     section("4. USER SCENARIOS")
     alice = clients["Alice"]

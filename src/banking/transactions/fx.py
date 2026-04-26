@@ -10,8 +10,18 @@ _FX_RATES: dict[tuple[str, str], float] = {
     ("RUB", "USD"): 0.011,
     ("EUR", "RUB"): 98.0,
     ("RUB", "EUR"): 0.010,
-    ("USD", "GBP"): 0.79,
-    ("GBP", "USD"): 1.27,
+    ("USD", "KZT"): 460.0,
+    ("KZT", "USD"): 0.00217,
+    ("EUR", "KZT"): 501.0,
+    ("KZT", "EUR"): 0.002,
+    ("RUB", "KZT"): 5.1,
+    ("KZT", "RUB"): 0.196,
+    ("USD", "CNY"): 7.24,
+    ("CNY", "USD"): 0.138,
+    ("EUR", "CNY"): 7.89,
+    ("CNY", "EUR"): 0.127,
+    ("RUB", "CNY"): 0.080,
+    ("CNY", "RUB"): 12.5,
 }
 
 
