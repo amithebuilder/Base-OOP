@@ -3,7 +3,13 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Iterator, Optional
 
-from banking.accounts import BaseAccount, InvestmentAccount, PremiumAccount, SavingsAccount
+from banking.accounts import (
+    AbstractAccount,
+    BankAccount,
+    InvestmentAccount,
+    PremiumAccount,
+    SavingsAccount,
+)
 from banking.customers import Client
 from banking.enums import AccountStatus, Currency
 from banking.exceptions import (
@@ -16,7 +22,8 @@ from banking.exceptions import (
 
 __all__ = ["Bank", "AccountTypeStr", "ACCOUNT_FACTORIES"]
 
-ACCOUNT_FACTORIES: dict[str, type[BaseAccount]] = {
+ACCOUNT_FACTORIES: dict[str, type[AbstractAccount]] = {
+    "bank": BankAccount,
     "savings": SavingsAccount,
     "premium": PremiumAccount,
     "investment": InvestmentAccount,
@@ -35,7 +42,7 @@ class Bank:
         self._name = name
         self._enforce_hours = enforce_hours
         self._clients: dict[str, Client] = {}
-        self._accounts: dict[str, BaseAccount] = {}
+        self._accounts: dict[str, AbstractAccount] = {}
         self._suspicious_log: list[dict] = []
 
     @property
@@ -49,7 +56,12 @@ class Bank:
         if self.RESTRICTED_START_HOUR <= hour < self.RESTRICTED_END_HOUR:
             raise OperationTimeError(hour)
 
-    def iter_accounts(self) -> Iterator[BaseAccount]:
+    # Public alias used by TransactionProcessor so it respects the same flag.
+    def check_business_hours(self) -> None:
+        """Raise OperationTimeError if transactions are currently forbidden."""
+        self._assert_business_hours()
+
+    def iter_accounts(self) -> Iterator[AbstractAccount]:
         return iter(self._accounts.values())
 
     def iter_clients(self) -> Iterator[Client]:
@@ -83,7 +95,7 @@ class Bank:
         currency: Currency = Currency.USD,
         initial_balance: float = 0.0,
         **kwargs: object,
-    ) -> BaseAccount:
+    ) -> AbstractAccount:
         self._assert_business_hours()
         self.get_client(client_id)
         factory = ACCOUNT_FACTORIES.get(account_type.lower())
@@ -112,10 +124,10 @@ class Bank:
         account = self._get_account(account_id)
         account.unfreeze()
 
-    def get_account(self, account_id: str) -> BaseAccount:
+    def get_account(self, account_id: str) -> AbstractAccount:
         return self._get_account(account_id)
 
-    def _get_account(self, account_id: str) -> BaseAccount:
+    def _get_account(self, account_id: str) -> AbstractAccount:
         try:
             return self._accounts[account_id]
         except KeyError as e:
@@ -126,7 +138,7 @@ class Bank:
         owner_id: Optional[str] = None,
         status: Optional[AccountStatus] = None,
         account_type: Optional[type] = None,
-    ) -> list[BaseAccount]:
+    ) -> list[AbstractAccount]:
         results = list(self._accounts.values())
         if owner_id:
             results = [a for a in results if a.owner_id == owner_id]

@@ -26,12 +26,8 @@ def main() -> None:
     analyzer = RiskAnalyzer(audit)
     txs = build_transactions(accounts)
     queue: TransactionQueue = TransactionQueue()
-    proc = TransactionProcessor(bank)
+    proc = TransactionProcessor(bank, risk_analyzer=analyzer)
     for tx in txs:
-        r = analyzer.assess(tx)
-        if r.is_dangerous():
-            tx._mark_failed("Blocked: high risk (manual review required)")
-            continue
         queue.enqueue(tx)
     proc.process_queue(queue)
     rb = ReportBuilder(

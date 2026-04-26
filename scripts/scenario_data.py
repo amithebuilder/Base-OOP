@@ -1,6 +1,6 @@
 from __future__ import annotations
 from datetime import date, datetime, timedelta
-from banking.accounts import BaseAccount
+from banking.accounts import AbstractAccount
 from banking import (
     Bank,
     Client,
@@ -10,7 +10,7 @@ from banking import (
     TxType,
 )
 
-def build_bank() -> tuple[Bank, dict[str, Client], dict[str, BaseAccount]]:
+def build_bank() -> tuple[Bank, dict[str, Client], dict[str, AbstractAccount]]:
     bank = Bank("PyBank Demo", enforce_hours=False)
     raw = [
         ("Alice", "Smith", date(1990, 3, 15), "alice@pybank.io", "+1-555-0001", "pw_alice"),
@@ -29,7 +29,7 @@ def build_bank() -> tuple[Bank, dict[str, Client], dict[str, BaseAccount]]:
     alice, bob, carol, david, eva, frank, grace = (
         clients[n] for n in ["Alice", "Bob", "Carol", "David", "Eva", "Frank", "Grace"]
     )
-    accounts: dict[str, BaseAccount] = {}
+    accounts: dict[str, AbstractAccount] = {}
 
     def open_acc(label: str, cid: str, atype: str, **kw: object) -> None:
         acc = bank.open_account(cid, atype, **kw)
@@ -59,7 +59,7 @@ def build_bank() -> tuple[Bank, dict[str, Client], dict[str, BaseAccount]]:
     return bank, clients, accounts
 
 
-def build_transactions(accounts: dict[str, BaseAccount]) -> list[Transaction]:
+def build_transactions(accounts: dict[str, AbstractAccount]) -> list[Transaction]:
     a = accounts
     return [
         Transaction(
@@ -245,8 +245,8 @@ def build_transactions(accounts: dict[str, BaseAccount]) -> list[Transaction]:
             description="EUR transfer",
         ),
         Transaction(
-            TxType.DEPOSIT, 500, Currency.GBP, receiver_id=a["david_inv"].account_id,  # type: ignore[union-attr, index, misc]
-            description="GBP income",
+            TxType.DEPOSIT, 500, Currency.CNY, receiver_id=a["david_inv"].account_id,  # type: ignore[union-attr, index, misc]
+            description="CNY income",
         ),
         Transaction(
             TxType.TRANSFER,

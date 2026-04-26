@@ -15,7 +15,8 @@ class Currency(Enum):
     USD = "USD"
     EUR = "EUR"
     RUB = "RUB"
-    GBP = "GBP"
+    KZT = "KZT"
+    CNY = "CNY"
 
 
 class TransactionType(Enum):

@@ -1,9 +1,11 @@
+"""Day 2 — InvestmentAccount: virtual portfolio + yearly-growth projection."""
+
 from __future__ import annotations
 
 from datetime import datetime
 from typing import Literal
 
-from banking.accounts.base import BaseAccount, AccountRecord
+from banking.accounts.base import AccountRecord, BankAccount
 from banking.enums import Currency, TransactionType
 from banking.exceptions import InsufficientFundsError, InvalidAmountError, WithdrawalLimitError
 
@@ -11,14 +13,16 @@ __all__ = ["AssetType", "InvestmentAsset", "InvestmentAccount"]
 
 AssetType = Literal["stocks", "bonds", "etf"]
 
-_ASSET_RATES: dict[str, float] = {
-    "stocks": 0.12,
-    "bonds": 0.05,
-    "etf": 0.08,
+_ASSET_ANNUAL_RATES: dict[str, float] = {
+    "stocks": 0.12,   # 12 % expected annual return
+    "bonds":  0.05,   #  5 %
+    "etf":    0.08,   #  8 %
 }
 
 
 class InvestmentAsset:
+    """A single virtual asset holding inside an InvestmentAccount."""
+
     def __init__(
         self,
         asset_type: AssetType,
@@ -26,21 +30,21 @@ class InvestmentAsset:
         quantity: float,
         unit_price: float,
     ) -> None:
-        if asset_type not in _ASSET_RATES:
-            raise ValueError(f"Unknown asset type: {asset_type}")
-        self.asset_type = asset_type
-        self.name = name
-        self.quantity = quantity
-        self.unit_price = unit_price
-        self.bought_at = datetime.now()
+        if asset_type not in _ASSET_ANNUAL_RATES:
+            raise ValueError(f"Unknown asset type '{asset_type}'.")
+        self.asset_type: AssetType = asset_type
+        self.name: str = name
+        self.quantity: float = quantity
+        self.unit_price: float = unit_price
+        self.bought_at: datetime = datetime.now()
 
     @property
     def market_value(self) -> float:
         return round(self.quantity * self.unit_price, 2)
 
     @property
-    def expected_annual_return(self) -> float:
-        return _ASSET_RATES[self.asset_type]
+    def annual_return_rate(self) -> float:
+        return _ASSET_ANNUAL_RATES[self.asset_type]
 
     def __str__(self) -> str:
         return (
@@ -50,10 +54,18 @@ class InvestmentAsset:
         )
 
 
-class InvestmentAccount(BaseAccount):
-    """Cash + virtual portfolio; withdrawals from cash only."""
+class InvestmentAccount(BankAccount):
+    """
+    Investment account (Day 2).
 
-    DAILY_WITHDRAWAL_LIMIT = 20_000.0
+    Extends BankAccount with:
+    - Virtual portfolio of assets (stocks, bonds, etf).
+    - buy_asset() / sell_asset() operations.
+    - project_yearly_growth() — compound-growth projection.
+    - Withdrawals only from cash balance (not from portfolio).
+    """
+
+    DAILY_WITHDRAWAL_LIMIT: float = 20_000.0
 
     def __init__(
         self,
@@ -64,6 +76,8 @@ class InvestmentAccount(BaseAccount):
         super().__init__(owner_id, currency, initial_balance)
         self._portfolio: list[InvestmentAsset] = []
 
+    # ── portfolio management ──────────────────────────────────────────
+
     def buy_asset(
         self,
         asset_type: AssetType,
@@ -71,6 +85,7 @@ class InvestmentAccount(BaseAccount):
         quantity: float,
         unit_price: float,
     ) -> InvestmentAsset:
+        """Purchase a virtual asset; cost debited from cash balance."""
         self._assert_operable()
         cost = round(quantity * unit_price, 2)
         if cost > self._balance:
@@ -78,16 +93,15 @@ class InvestmentAccount(BaseAccount):
         self._balance -= cost
         asset = InvestmentAsset(asset_type, name, quantity, unit_price)
         self._portfolio.append(asset)
-        self._record(
-            TransactionType.WITHDRAWAL, cost, f"Buy {name} ({asset_type})"
-        )
+        self._record(TransactionType.WITHDRAWAL, cost, f"Buy {name} ({asset_type})")
         return asset
 
     def sell_asset(self, name: str, quantity: float | None = None) -> float:
+        """Sell a holding by name; proceeds credited to cash balance."""
         self._assert_operable()
         for asset in self._portfolio:
             if asset.name == name:
-                qty = quantity or asset.quantity
+                qty = quantity if quantity is not None else asset.quantity
                 if qty > asset.quantity:
                     raise InvalidAmountError(qty)
                 proceeds = round(qty * asset.unit_price, 2)
@@ -105,32 +119,37 @@ class InvestmentAccount(BaseAccount):
 
     @property
     def portfolio_value(self) -> float:
+        """Total market value of all held assets."""
         return round(sum(a.market_value for a in self._portfolio), 2)
 
     @property
     def total_value(self) -> float:
+        """Cash balance + portfolio market value."""
         return round(self._balance + self.portfolio_value, 2)
 
     def project_yearly_growth(self, years: int = 1) -> dict:
+        """Compound-growth projection for each asset over *years* years."""
         projections: dict[str, float] = {}
-        portfolio_now = self.portfolio_value
         for asset in self._portfolio:
-            rate = asset.expected_annual_return
-            future = round(asset.market_value * ((1 + rate) ** years), 2)
+            future = round(asset.market_value * ((1 + asset.annual_return_rate) ** years), 2)
             projections[asset.name] = future
+
         projected_portfolio = round(sum(projections.values()), 2)
-        gain = round(projected_portfolio - portfolio_now, 2)
+        gain = round(projected_portfolio - self.portfolio_value, 2)
         return {
             "years": years,
             "cash_balance": self._balance,
-            "portfolio_now": portfolio_now,
+            "portfolio_now": self.portfolio_value,
             "projected_portfolio": projected_portfolio,
             "projected_gain": gain,
             "projected_total": round(self._balance + projected_portfolio, 2),
             "asset_breakdown": projections,
         }
 
+    # ── overrides ─────────────────────────────────────────────────────
+
     def withdraw(self, amount: float, description: str = "") -> AccountRecord:
+        """Withdraw from cash balance only (portfolio is not liquidated)."""
         self._assert_operable()
         self._validate_amount(amount)
         if amount > self.DAILY_WITHDRAWAL_LIMIT:
@@ -158,7 +177,7 @@ class InvestmentAccount(BaseAccount):
 
     def __str__(self) -> str:
         return (
-            f"InvestmentAccount [{self._account_id[:8]}] | "
+            f"InvestmentAccount [...{self._account_id[-4:]}] | "
             f"owner={self._owner_id} | "
             f"cash={self._balance:.2f} | "
             f"portfolio={self.portfolio_value:.2f} | "

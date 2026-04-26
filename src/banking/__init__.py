@@ -1,11 +1,14 @@
 """
 Banking platform: accounts, customers, core bank, transactions, audit, reports.
+
+Public API surface — import from here in scripts and tests.
 """
 
 from banking.accounts import (
+    AbstractAccount,
     AccountRecord,
     AssetType,
-    BaseAccount,
+    BankAccount,
     InvestmentAccount,
     InvestmentAsset,
     PremiumAccount,
@@ -22,6 +25,17 @@ from banking.audit import (
 from banking.core import ACCOUNT_FACTORIES, Bank
 from banking.customers import Client
 from banking.enums import AccountStatus, Currency, TransactionType
+from banking.exceptions import (
+    AccountClosedError,
+    AccountFrozenError,
+    BankingError,
+    InsufficientFundsError,
+    InvalidAmountError,
+    InvalidOperationError,
+    OperationTimeError,
+    WithdrawalLimitError,
+    MinimumBalanceError,
+)
 from banking.reports import ReportBuilder
 from banking.transactions import (
     Transaction,
@@ -34,25 +48,43 @@ from banking.transactions import (
 )
 
 __all__ = [
-    "ACCOUNT_FACTORIES",
+    # Accounts
+    "AbstractAccount",
     "AccountRecord",
     "AccountStatus",
     "AssetType",
-    "AuditEntry",
-    "AuditLog",
-    "BaseAccount",
-    "Bank",
-    "Client",
-    "Currency",
+    "BankAccount",
     "InvestmentAccount",
     "InvestmentAsset",
     "PremiumAccount",
-    "ReportBuilder",
+    "SavingsAccount",
+    # Audit
+    "AuditEntry",
+    "AuditLog",
     "RiskAnalyzer",
     "RiskLevel",
     "RiskReport",
-    "SavingsAccount",
     "Severity",
+    # Bank / clients
+    "ACCOUNT_FACTORIES",
+    "Bank",
+    "Client",
+    # Enums
+    "Currency",
+    "TransactionType",
+    # Exceptions
+    "AccountClosedError",
+    "AccountFrozenError",
+    "BankingError",
+    "InsufficientFundsError",
+    "InvalidAmountError",
+    "InvalidOperationError",
+    "MinimumBalanceError",
+    "OperationTimeError",
+    "WithdrawalLimitError",
+    # Reports
+    "ReportBuilder",
+    # Transactions
     "Transaction",
     "TransactionProcessor",
     "TransactionQueue",
@@ -63,4 +95,4 @@ __all__ = [
     "convert",
 ]
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
