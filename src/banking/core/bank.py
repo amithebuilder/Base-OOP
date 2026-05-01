@@ -19,6 +19,7 @@ from banking.exceptions import (
     DuplicateClientError,
     OperationTimeError,
 )
+from banking.transactions.fx import convert
 
 __all__ = ["Bank", "AccountTypeStr", "ACCOUNT_FACTORIES"]
 
@@ -157,9 +158,10 @@ class Bank:
         ]
 
     def get_total_balance(self) -> float:
+        """Return total balance of all active accounts, normalised to USD."""
         return round(
             sum(
-                a.balance
+                convert(a.balance, a.currency, Currency.USD)
                 for a in self._accounts.values()
                 if a.status == AccountStatus.ACTIVE
             ),
@@ -167,10 +169,11 @@ class Bank:
         )
 
     def get_clients_ranking(self) -> list[dict]:
+        """Rank clients by total balance; all amounts normalised to USD."""
         ranking: list[dict] = []
         for cl in self._clients.values():
             total = sum(
-                self._accounts[aid].balance
+                convert(self._accounts[aid].balance, self._accounts[aid].currency, Currency.USD)
                 for aid in cl.account_ids
                 if aid in self._accounts
                 and self._accounts[aid].status == AccountStatus.ACTIVE
