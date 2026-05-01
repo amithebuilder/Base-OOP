@@ -9,7 +9,9 @@ from typing import Optional
 from banking.audit import AuditLog, RiskAnalyzer
 from banking.core import Bank
 from banking.customers import Client
+from banking.enums import Currency
 from banking.transactions import Transaction, TxStatus
+from banking.transactions.fx import convert
 
 __all__ = ["ReportBuilder"]
 
@@ -56,12 +58,12 @@ class ReportBuilder:
         completed = [t for t in client_txs if t.status == TxStatus.COMPLETED]
         failed = [t for t in client_txs if t.status == TxStatus.FAILED]
         total_in = sum(
-            t.amount
+            convert(t.amount, t.currency, Currency.USD)
             for t in completed
             if t.receiver_id and t.receiver_id in acc_set
         )
         total_out = sum(
-            t.amount
+            convert(t.amount, t.currency, Currency.USD)
             for t in completed
             if t.sender_id and t.sender_id in acc_set
         )
@@ -92,15 +94,17 @@ class ReportBuilder:
         for acc in all_accs:
             t = acc.__class__.__name__
             if t not in by_type:
-                by_type[t] = {"count": 0, "total_balance": 0.0}
+                by_type[t] = {"count": 0, "total_balance_usd": 0.0}
             by_type[t]["count"] += 1
-            by_type[t]["total_balance"] = round(
-                by_type[t]["total_balance"] + acc.balance, 2
+            by_type[t]["total_balance_usd"] = round(
+                by_type[t]["total_balance_usd"]
+                + convert(acc.balance, acc.currency, Currency.USD),
+                2,
             )
         completed = [t for t in self._txs if t.status == TxStatus.COMPLETED]
         failed = [t for t in self._txs if t.status == TxStatus.FAILED]
-        total_vol = sum(t.amount for t in completed)
-        total_fee = sum(t.fee_charged for t in completed)
+        total_vol = sum(convert(t.amount, t.currency, Currency.USD) for t in completed)
+        total_fee = sum(convert(t.fee_charged, t.currency, Currency.USD) for t in completed)
         by_tx_type: dict[str, int] = {}
         for t in self._txs:
             k = t.tx_type.value
@@ -312,7 +316,7 @@ class ReportBuilder:
         vol: dict[str, float] = {}
         for t in completed:
             k = t.tx_type.value
-            vol[k] = round(vol.get(k, 0.0) + t.amount, 2)
+            vol[k] = round(vol.get(k, 0.0) + convert(t.amount, t.currency, Currency.USD), 2)
         if not vol:
             return []
         fig, ax = plt.subplots(figsize=(7, 4))  # type: ignore[union-attr]

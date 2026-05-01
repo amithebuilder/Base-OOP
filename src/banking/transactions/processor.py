@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Optional
 
 from banking.accounts import AbstractAccount  # noqa: F401 (used in type hints)
 from banking.core import Bank
+from banking.enums import AccountStatus
 from banking.exceptions import BankingError
 from banking.transactions.fx import convert
 from banking.transactions.models import Transaction, TxType
@@ -131,16 +132,34 @@ class TransactionProcessor:
         sender = self._get_account(tx.sender_id)
         receiver = self._get_account(tx.receiver_id)
 
+        # Pre-validate both accounts before touching any funds.
+        # This ensures that a frozen/closed receiver is caught here,
+        # before the sender is debited — otherwise a failed deposit
+        # followed by a retry would debit the sender a second time.
+        if sender.status != AccountStatus.ACTIVE:
+            raise BankingError(
+                f"Sender account {tx.sender_id} is not active ({sender.status.value})."
+            )
+        if receiver.status != AccountStatus.ACTIVE:
+            raise BankingError(
+                f"Receiver account {tx.receiver_id} is not active ({receiver.status.value})."
+            )
+
         is_external = sender.owner_id != receiver.owner_id
         fee_rate = self.EXTERNAL_FEE_RATE if is_external else tx.fee_rate
         fee_amount = round(tx.amount * fee_rate, 2)
         total_debit = tx.amount + fee_amount
 
         debit_amount = convert(total_debit, tx.currency, sender.currency)
-        sender.withdraw(debit_amount, f"Transfer to ...{tx.receiver_id[-4:]}")
-
         credit_amount = convert(tx.amount, tx.currency, receiver.currency)
-        receiver.deposit(credit_amount, f"Transfer from ...{tx.sender_id[-4:]}")
+
+        sender.withdraw(debit_amount, f"Transfer to ...{tx.receiver_id[-4:]}")
+        try:
+            receiver.deposit(credit_amount, f"Transfer from ...{tx.sender_id[-4:]}")
+        except BankingError:
+            # Rollback: reverse the withdrawal so accounts stay in sync.
+            sender.deposit(debit_amount, f"Rollback: transfer to ...{tx.receiver_id[-4:]}")
+            raise
 
         tx._mark_completed(fee=fee_amount)
 
